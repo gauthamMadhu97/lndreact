@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { User, Mail, Briefcase, Award, Calendar } from 'lucide-react'
 import { getEmployeeUtilization } from '@/data/mockData'
 import { format } from 'date-fns'
-import { AvailabilityStatus } from '@/types'
+import type { AvailabilityStatus } from '@/types'
 
 export const ProfilePage = () => {
   const { user } = useAuth()

@@ -12,8 +12,6 @@ import {
   Users
 } from 'lucide-react'
 import {
-  mockProjects,
-  mockAssignments,
   getAssignmentsByEmployee,
   getProjectById,
   getUserById,
@@ -142,7 +140,7 @@ export const EmployeeDashboard = () => {
           <CardDescription>Projects you're currently working on</CardDescription>
         </CardHeader>
         <CardContent>
-          {stats.activeAssignments.length === 0 ? (
+          {!stats.activeAssignments || stats.activeAssignments.length === 0 ? (
             <div className="text-center py-12">
               <FolderKanban className="mx-auto h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-semibold">No Active Assignments</h3>
@@ -152,7 +150,7 @@ export const EmployeeDashboard = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {stats.activeAssignments.map((assignment) => {
+              {stats.activeAssignments?.map((assignment) => {
                 const project = getProjectById(assignment.projectId)
                 const manager = getUserById(project?.managerId || '')
                 if (!project) return null

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { LayoutGrid, List, Plus, Search, Filter, Calendar, Users } from 'lucide-react'
 import { mockProjects, mockAssignments } from '@/data/mockData'
 import { format } from 'date-fns'
-import { ProjectStatus } from '@/types'
+import type { ProjectStatus } from '@/types'
 
 export const ProjectsPage = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')

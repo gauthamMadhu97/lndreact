@@ -18,8 +18,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// Analytics will be initialized when needed
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const analytics = getAnalytics(app);
+// Analytics is initialized but not exported as it's used internally by Firebase
+getAnalytics(app);
 
 export { app };

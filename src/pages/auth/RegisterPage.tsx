@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { UserRole } from '@/types'
+import type { UserRole } from '@/types'
 import { Mail, Lock, User, Building2, Code2, UserPlus, Sparkles } from 'lucide-react'
 
 export const RegisterPage = () => {

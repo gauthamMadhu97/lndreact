@@ -1,14 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
-  User as FirebaseUser
+  onAuthStateChanged
 } from 'firebase/auth'
+import type { User as FirebaseUser } from 'firebase/auth'
 import { app } from '@/firebase'
-import { User, AuthContextType, UserRole } from '@/types'
+import type { User, AuthContextType, UserRole } from '@/types'
 import { createUser, getUser } from '@/services/firebaseService'
 
 const auth = getAuth(app)

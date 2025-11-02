@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, UserPlus, Mail, Briefcase } from 'lucide-react'
 import { mockUsers, getEmployeeUtilization } from '@/data/mockData'
-import { AvailabilityStatus } from '@/types'
+import type { AvailabilityStatus } from '@/types'
 
 export const ResourcesPage = () => {
   const [searchQuery, setSearchQuery] = useState('')

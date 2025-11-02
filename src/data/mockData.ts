@@ -1,4 +1,4 @@
-import { User, Project, Assignment } from '@/types'
+import type { User, Project, Assignment } from '@/types'
 
 export const mockUsers: User[] = [
   // Managers

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { mockUsers, getEmployeeUtilization, mockProjects } from '@/data/mockData'
-import { Users, TrendingUp, Award } from 'lucide-react'
+import { Users, Award } from 'lucide-react'
 
 export const TeamPage = () => {
   const employees = mockUsers.filter(u => u.role === 'employee')

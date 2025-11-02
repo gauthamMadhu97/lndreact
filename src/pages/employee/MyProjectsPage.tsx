@@ -166,7 +166,7 @@ export const MyProjectsPage = () => {
           <Card>
             <CardContent className="p-0">
               <div className="divide-y">
-                {completedProjects.map(({ assignment, project, manager }) => {
+                {completedProjects.map(({ assignment, project }) => {
                   if (!project) return null
                   return (
                     <div key={assignment.id} className="p-4 hover:bg-muted/50 transition-colors">

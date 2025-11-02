@@ -6,7 +6,7 @@ import {
   getAssignmentsByProject,
   getEmployeeUtilization as getUtilization
 } from '@/services/firebaseService'
-import { User, Project, Assignment } from '@/types'
+import type { User, Project, Assignment } from '@/types'
 
 export const useProjects = () => {
   const [projects, setProjects] = useState<Project[]>([])

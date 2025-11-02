@@ -14,7 +14,7 @@ import {
   addDoc
 } from 'firebase/firestore'
 import { app } from '@/firebase'
-import { User, Project, Assignment } from '@/types'
+import type { User, Project, Assignment } from '@/types'
 
 const db = getFirestore(app)
 
