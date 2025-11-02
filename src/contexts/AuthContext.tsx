@@ -1,6 +1,17 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth'
+import { app } from '@/firebase'
 import { User, AuthContextType, UserRole } from '@/types'
-import { mockUsers } from '@/data/mockData'
+import { createUser, getUser } from '@/services/firebaseService'
+
+const auth = getAuth(app)
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -18,27 +29,22 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const login = async (email: string, password: string, role: UserRole) => {
-    setLoading(true)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        // Fetch user data from Firestore
+        const userData = await getUser(firebaseUser.uid)
+        setUser(userData)
+      } else {
+        setUser(null)
+      }
+      setLoading(false)
+    })
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    // Mock login - find user by email and role
-    const foundUser = mockUsers.find(
-      u => u.email === email && u.role === role
-    )
-
-    if (foundUser) {
-      setUser(foundUser)
-    } else {
-      throw new Error('Invalid credentials')
-    }
-
-    setLoading(false)
-  }
+    return unsubscribe
+  }, [])
 
   const register = async (
     email: string,
@@ -49,29 +55,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     skills: string[]
   ) => {
     setLoading(true)
+    try {
+      console.log('Starting registration process...')
+      // Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const firebaseUser = userCredential.user
+      console.log('Firebase Auth user created:', firebaseUser.uid)
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
+      // Create user document in Firestore
+      const userData: Omit<User, 'uid' | 'createdAt'> = {
+        email,
+        displayName,
+        role,
+        department,
+        skills,
+        availability: 'available'
+      }
 
-    // Mock registration - create new user
-    const newUser: User = {
-      uid: `${role[0]}${Date.now()}`,
-      email,
-      displayName,
-      role,
-      department,
-      skills,
-      availability: 'available',
-      photoURL: undefined,
-      createdAt: new Date()
+      console.log('Creating user document in Firestore...')
+      await createUser(firebaseUser.uid, userData)
+      console.log('User document created successfully')
+
+      // Fetch and set user data
+      console.log('Fetching user data...')
+      const newUser = await getUser(firebaseUser.uid)
+      console.log('User data fetched:', newUser)
+      setUser(newUser)
+    } catch (error) {
+      console.error('Registration error:', error)
+      throw error
+    } finally {
+      setLoading(false)
     }
-
-    setUser(newUser)
-    setLoading(false)
   }
 
-  const logout = () => {
-    setUser(null)
+  const login = async (email: string, password: string) => {
+    setLoading(true)
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const firebaseUser = userCredential.user
+
+      // Fetch user data from Firestore
+      const userData = await getUser(firebaseUser.uid)
+      if (!userData) {
+        throw new Error('User data not found')
+      }
+      setUser(userData)
+    } catch (error) {
+      console.error('Login error:', error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await signOut(auth)
+      setUser(null)
+    } catch (error) {
+      console.error('Logout error:', error)
+      throw error
+    }
   }
 
   const value: AuthContextType = {
