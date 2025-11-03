@@ -165,7 +165,7 @@ export const getProjectsByStatus = async (status: string): Promise<Project[]> =>
 
 export const updateProject = async (projectId: string, updates: Partial<Project>) => {
   const projectRef = doc(db, PROJECTS_COLLECTION, projectId)
-  const updateData: Record<string, unknown> = { ...updates }
+  const updateData: Record<string, any> = { ...updates }
 
   if (updates.startDate) {
     updateData.startDate = Timestamp.fromDate(updates.startDate)
@@ -178,6 +178,15 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
 }
 
 export const deleteProject = async (projectId: string) => {
+  // First, delete all assignments associated with this project (cascade delete)
+  const assignments = await getAssignmentsByProject(projectId)
+
+  if (assignments.length > 0) {
+    // Delete all assignments in parallel
+    await Promise.all(assignments.map(assignment => deleteAssignment(assignment.id)))
+  }
+
+  // Then delete the project
   const projectRef = doc(db, PROJECTS_COLLECTION, projectId)
   await deleteDoc(projectRef)
 }
@@ -247,7 +256,7 @@ export const getAssignmentsByProject = async (projectId: string): Promise<Assign
 
 export const updateAssignment = async (assignmentId: string, updates: Partial<Assignment>) => {
   const assignmentRef = doc(db, ASSIGNMENTS_COLLECTION, assignmentId)
-  const updateData: Record<string, unknown> = { ...updates }
+  const updateData: Record<string, any> = { ...updates }
 
   if (updates.startDate) {
     updateData.startDate = Timestamp.fromDate(updates.startDate)
@@ -269,3 +278,26 @@ export const getEmployeeUtilization = async (employeeId: string): Promise<number
   const assignments = await getAssignmentsByEmployee(employeeId)
   return assignments.reduce((total, assignment) => total + assignment.allocationPercentage, 0)
 }
+
+// Get all assignments
+export const getAllAssignments = async (): Promise<Assignment[]> => {
+  const assignmentsRef = collection(db, ASSIGNMENTS_COLLECTION)
+  const snapshot = await getDocs(assignmentsRef)
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data()
+    return {
+      ...data,
+      id: doc.id,
+      startDate: data.startDate.toDate(),
+      endDate: data.endDate ? data.endDate.toDate() : undefined,
+      createdAt: data.createdAt.toDate()
+    } as Assignment
+  })
+}
+
+// Get project by ID (simpler version, already exists as getProject)
+export const getProjectById = getProject
+
+// Get user by ID (simpler version, already exists as getUser)
+export const getUserById = getUser

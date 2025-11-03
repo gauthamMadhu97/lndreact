@@ -1,27 +1,65 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, UserPlus, Mail, Briefcase } from 'lucide-react'
-import { mockUsers, getEmployeeUtilization } from '@/data/mockData'
-import type { AvailabilityStatus } from '@/types'
+import { getUsersByRole, getEmployeeUtilization } from '@/services/firebaseService'
+import type { AvailabilityStatus, User } from '@/types'
+import { AssignmentDialog } from '@/components/forms/AssignmentDialog'
 
 export const ResourcesPage = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityStatus | 'all'>('all')
+  const [employees, setEmployees] = useState<User[]>([])
+  const [utilizationMap, setUtilizationMap] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
 
-  const employees = mockUsers.filter(u => u.role === 'employee')
+  // Assignment dialog state
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const employeesData = await getUsersByRole('employee')
+      setEmployees(employeesData)
+
+      // Calculate utilization for each employee
+      const utilizations: Record<string, number> = {}
+      for (const emp of employeesData) {
+        utilizations[emp.uid] = await getEmployeeUtilization(emp.uid)
+      }
+      setUtilizationMap(utilizations)
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const matchesSearch = emp.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           emp.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           emp.department.toLowerCase().includes(searchQuery.toLowerCase())
+        emp.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        emp.department.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesAvailability = availabilityFilter === 'all' || emp.availability === availabilityFilter
       return matchesSearch && matchesAvailability
     })
   }, [employees, searchQuery, availabilityFilter])
+
+  const handleAssignEmployee = (employeeId: string) => {
+    setSelectedEmployeeId(employeeId)
+    setAssignmentDialogOpen(true)
+  }
+
+  const handleAssignmentSuccess = async () => {
+    await fetchData()
+  }
 
   const getUtilizationColor = (utilization: number) => {
     if (utilization === 0) return 'bg-gray-500'
@@ -38,6 +76,17 @@ export const ResourcesPage = () => {
       case 'onLeave': return 'destructive'
       default: return 'default'
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading resources...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -102,7 +151,7 @@ export const ResourcesPage = () => {
       {/* Employee Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredEmployees.map((employee) => {
-          const utilization = getEmployeeUtilization(employee.uid)
+          const utilization = utilizationMap[employee.uid] || 0
           return (
             <Card key={employee.uid} className="hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -143,7 +192,7 @@ export const ResourcesPage = () => {
                   <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all ${getUtilizationColor(utilization)}`}
-                      style={{ width: `${utilization}%` }}
+                      style={{ width: `${utilization > 100 ? 100 : utilization}%` }}
                     />
                   </div>
                 </div>
@@ -168,11 +217,14 @@ export const ResourcesPage = () => {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Assign
-                  </Button>
-                  <Button variant="ghost" size="sm" className="flex-1">
-                    View
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleAssignEmployee(employee.uid)}
+                  >
+                    <UserPlus className="h-3 w-3 mr-1" />
+                    Assign to Project
                   </Button>
                 </div>
               </CardContent>
@@ -194,6 +246,14 @@ export const ResourcesPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Assignment Dialog */}
+      <AssignmentDialog
+        open={assignmentDialogOpen}
+        onOpenChange={setAssignmentDialogOpen}
+        preSelectedEmployeeId={selectedEmployeeId}
+        onSuccess={handleAssignmentSuccess}
+      />
     </div>
   )
 }

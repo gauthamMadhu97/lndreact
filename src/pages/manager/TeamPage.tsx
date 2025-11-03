@@ -1,14 +1,44 @@
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { mockUsers, getEmployeeUtilization, mockProjects } from '@/data/mockData'
+import { getUsersByRole, getEmployeeUtilization, getAllProjects } from '@/services/firebaseService'
+import type { User, Project } from '@/types'
 import { Users, Award } from 'lucide-react'
 
 export const TeamPage = () => {
-  const employees = mockUsers.filter(u => u.role === 'employee')
+  const [employees, setEmployees] = useState<User[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [utilizationMap, setUtilizationMap] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [employeesData, projectsData] = await Promise.all([
+          getUsersByRole('employee'),
+          getAllProjects()
+        ])
+        setEmployees(employeesData)
+        setProjects(projectsData)
+
+        const utilizations: Record<string, number> = {}
+        for (const emp of employeesData) {
+          utilizations[emp.uid] = await getEmployeeUtilization(emp.uid)
+        }
+        setUtilizationMap(utilizations)
+      } catch (error) {
+        console.error('Error fetching team data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
   const departments = [...new Set(employees.map(e => e.department))]
 
   const getUtilizationStats = () => {
-    const utils = employees.map(e => getEmployeeUtilization(e.uid))
+    const utils = Object.values(utilizationMap)
     const available = utils.filter(u => u < 70).length
     const nearCapacity = utils.filter(u => u >= 70 && u < 90).length
     const fullCapacity = utils.filter(u => u >= 90).length
@@ -16,6 +46,17 @@ export const TeamPage = () => {
   }
 
   const stats = getUtilizationStats()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading team data...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -82,7 +123,7 @@ export const TeamPage = () => {
             {departments.map(dept => {
               const deptEmployees = employees.filter(e => e.department === dept)
               const avgUtil = Math.round(
-                deptEmployees.reduce((sum, e) => sum + getEmployeeUtilization(e.uid), 0) / deptEmployees.length
+                deptEmployees.reduce((sum, e) => sum + (utilizationMap[e.uid] || 0), 0) / deptEmployees.length
               )
               return (
                 <div key={dept} className="border-b pb-4 last:border-0 last:pb-0">
@@ -101,7 +142,7 @@ export const TeamPage = () => {
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mt-3">
                     {deptEmployees.map(emp => {
-                      const util = getEmployeeUtilization(emp.uid)
+                      const util = utilizationMap[emp.uid] || 0
                       return (
                         <div
                           key={emp.uid}
@@ -181,12 +222,10 @@ export const TeamPage = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockProjects
+            {projects
               .filter(p => p.status === 'active')
               .map(project => {
-                const assignments = mockUsers.filter(u =>
-                  u.role === 'employee'
-                )
+                const activeEmployees = employees
                 return (
                   <div
                     key={project.id}
@@ -198,7 +237,7 @@ export const TeamPage = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">{assignments.length} members</span>
+                      <span className="text-sm font-medium">{activeEmployees.length} members</span>
                     </div>
                   </div>
                 )

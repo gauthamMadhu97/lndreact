@@ -120,11 +120,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
+  const refreshUser = async () => {
+    if (!user) return
+    try {
+      const userData = await getUser(user.uid)
+      setUser(userData)
+    } catch (error) {
+      console.error('Refresh user error:', error)
+      throw error
+    }
+  }
+
   const value: AuthContextType = {
     user,
     login,
     register,
     logout,
+    refreshUser,
     loading
   }
 

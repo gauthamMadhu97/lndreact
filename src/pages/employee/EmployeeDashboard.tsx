@@ -1,43 +1,104 @@
-import { useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { StatCard } from '@/components/common/StatCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   FolderKanban,
   Clock,
   TrendingUp,
   Calendar,
-  Users
+  Edit,
+  X
 } from 'lucide-react'
 import {
   getAssignmentsByEmployee,
   getProjectById,
-  getUserById,
-  getEmployeeUtilization
-} from '@/data/mockData'
+  getEmployeeUtilization,
+  updateUser
+} from '@/services/firebaseService'
+import type { Assignment, Project, AvailabilityStatus } from '@/types'
 import { format } from 'date-fns'
 
 export const EmployeeDashboard = () => {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [projects, setProjects] = useState<Record<string, Project>>({})
+  const [utilization, setUtilization] = useState(0)
 
-  const stats = useMemo(() => {
-    if (!user) return { assignments: [], utilization: 0, activeProjects: 0 }
+  // Availability dialog state
+  const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false)
+  const [selectedAvailability, setSelectedAvailability] = useState<AvailabilityStatus>('available')
+  const [updatingAvailability, setUpdatingAvailability] = useState(false)
 
-    const userAssignments = getAssignmentsByEmployee(user.uid)
-    const activeAssignments = userAssignments.filter(a => {
-      const project = getProjectById(a.projectId)
-      return project?.status === 'active' || project?.status === 'planning'
-    })
+  // Skills dialog state
+  const [skillsDialogOpen, setSkillsDialogOpen] = useState(false)
+  const [skillInput, setSkillInput] = useState('')
+  const [editedSkills, setEditedSkills] = useState<string[]>([])
+  const [updatingSkills, setUpdatingSkills] = useState(false)
 
-    return {
-      assignments: userAssignments,
-      activeAssignments,
-      utilization: getEmployeeUtilization(user.uid),
-      activeProjects: activeAssignments.length
+  // Fetch employee data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return
+
+      try {
+        setLoading(true)
+
+        // Fetch assignments
+        const userAssignments = await getAssignmentsByEmployee(user.uid)
+        setAssignments(userAssignments)
+
+        // Fetch projects for assignments
+        const projectsMap: Record<string, Project> = {}
+        for (const assignment of userAssignments) {
+          try {
+            const project = await getProjectById(assignment.projectId)
+            if (project) {
+              projectsMap[project.id] = project
+            }
+          } catch (err) {
+            console.error(`Error fetching project ${assignment.projectId}:`, err)
+          }
+        }
+        setProjects(projectsMap)
+
+        // Fetch utilization
+        const userUtilization = await getEmployeeUtilization(user.uid)
+        setUtilization(userUtilization)
+      } catch (err) {
+        console.error('Error fetching employee data:', err)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchData()
   }, [user])
+
+  const activeAssignments = assignments.filter(a => {
+    const project = projects[a.projectId]
+    return project?.status === 'active' || project?.status === 'planning'
+  })
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -59,6 +120,77 @@ export const EmployeeDashboard = () => {
     }
   }
 
+  // Availability handlers
+  const handleOpenAvailabilityDialog = () => {
+    setSelectedAvailability(user?.availability || 'available')
+    setAvailabilityDialogOpen(true)
+  }
+
+  const handleUpdateAvailability = async () => {
+    if (!user) return
+
+    try {
+      setUpdatingAvailability(true)
+      await updateUser(user.uid, { availability: selectedAvailability })
+      await refreshUser()
+      setAvailabilityDialogOpen(false)
+    } catch (err) {
+      console.error('Error updating availability:', err)
+      alert('Failed to update availability. Please try again.')
+    } finally {
+      setUpdatingAvailability(false)
+    }
+  }
+
+  // Skills handlers
+  const handleOpenSkillsDialog = () => {
+    setEditedSkills([...(user?.skills || [])])
+    setSkillInput('')
+    setSkillsDialogOpen(true)
+  }
+
+  const handleAddSkill = () => {
+    const trimmedSkill = skillInput.trim()
+    if (trimmedSkill && !editedSkills.includes(trimmedSkill)) {
+      setEditedSkills([...editedSkills, trimmedSkill])
+      setSkillInput('')
+    }
+  }
+
+  const handleRemoveSkill = (skillToRemove: string) => {
+    setEditedSkills(editedSkills.filter(skill => skill !== skillToRemove))
+  }
+
+  const handleUpdateSkills = async () => {
+    if (!user || editedSkills.length === 0) {
+      alert('Please add at least one skill.')
+      return
+    }
+
+    try {
+      setUpdatingSkills(true)
+      await updateUser(user.uid, { skills: editedSkills })
+      await refreshUser()
+      setSkillsDialogOpen(false)
+    } catch (err) {
+      console.error('Error updating skills:', err)
+      alert('Failed to update skills. Please try again.')
+    } finally {
+      setUpdatingSkills(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -73,13 +205,13 @@ export const EmployeeDashboard = () => {
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           title="Active Projects"
-          value={stats.activeProjects}
+          value={activeAssignments.length}
           icon={FolderKanban}
           description="Currently assigned"
         />
         <StatCard
           title="Total Allocation"
-          value={`${stats.utilization}%`}
+          value={`${utilization}%`}
           icon={Clock}
           description="Current workload"
         />
@@ -94,9 +226,11 @@ export const EmployeeDashboard = () => {
 
       {/* Profile Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Your Profile</CardTitle>
-          <CardDescription>Your information and skills</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Your Profile</CardTitle>
+            <CardDescription>Your information and skills</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2">
@@ -110,14 +244,34 @@ export const EmployeeDashboard = () => {
                 <p className="text-sm">{user?.department}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Availability Status</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium text-muted-foreground">Availability Status</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleOpenAvailabilityDialog}
+                  >
+                    <Edit className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                </div>
                 <p className={`text-sm font-semibold capitalize ${getAvailabilityColor(user?.availability || '')}`}>
                   {user?.availability}
                 </p>
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">Skills</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground">Skills</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleOpenSkillsDialog}
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {user?.skills.map((skill) => (
                   <span
@@ -140,7 +294,7 @@ export const EmployeeDashboard = () => {
           <CardDescription>Projects you're currently working on</CardDescription>
         </CardHeader>
         <CardContent>
-          {!stats.activeAssignments || stats.activeAssignments.length === 0 ? (
+          {activeAssignments.length === 0 ? (
             <div className="text-center py-12">
               <FolderKanban className="mx-auto h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-semibold">No Active Assignments</h3>
@@ -150,9 +304,8 @@ export const EmployeeDashboard = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {stats.activeAssignments?.map((assignment) => {
-                const project = getProjectById(assignment.projectId)
-                const manager = getUserById(project?.managerId || '')
+              {activeAssignments.map((assignment) => {
+                const project = projects[assignment.projectId]
                 if (!project) return null
 
                 return (
@@ -169,16 +322,21 @@ export const EmployeeDashboard = () => {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {project.description}
+                          {project.client}
                         </p>
+                        {project.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {project.description}
+                          </p>
+                        )}
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {format(project.startDate, 'MMM dd, yyyy')} - {format(project.endDate, 'MMM dd, yyyy')}
                           </span>
                           <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            Manager: {manager?.displayName || 'Unknown'}
+                            <Calendar className="h-3 w-3" />
+                            Started: {format(assignment.startDate, 'MMM dd, yyyy')}
                           </span>
                         </div>
                         <div className="flex gap-1 flex-wrap">
@@ -207,27 +365,137 @@ export const EmployeeDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
-            <CardTitle className="text-lg">Update Availability</CardTitle>
-            <CardDescription>Change your current availability status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full">Manage Availability</Button>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader>
-            <CardTitle className="text-lg">View All Projects</CardTitle>
-            <CardDescription>See complete list of your projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="w-full">Go to Projects</Button>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Availability Dialog */}
+      <Dialog open={availabilityDialogOpen} onOpenChange={setAvailabilityDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Update Availability</DialogTitle>
+            <DialogDescription>
+              Change your current availability status to help managers with resource planning.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="availability">
+                Availability Status <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={selectedAvailability}
+                onValueChange={(value) => setSelectedAvailability(value as AvailabilityStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select availability" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="partial">Partially Available</SelectItem>
+                  <SelectItem value="full">Fully Allocated</SelectItem>
+                  <SelectItem value="onLeave">On Leave</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This helps managers know your current capacity for new projects.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAvailabilityDialogOpen(false)}
+              disabled={updatingAvailability}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateAvailability} disabled={updatingAvailability}>
+              {updatingAvailability ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2"></div>
+                  Updating...
+                </>
+              ) : (
+                'Update Availability'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Skills Dialog */}
+      <Dialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Skills</DialogTitle>
+            <DialogDescription>
+              Add or remove skills to showcase your expertise.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="skill-input">Add Skill</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="skill-input"
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddSkill()
+                    }
+                  }}
+                  placeholder="e.g., React, Python, Design"
+                />
+                <Button onClick={handleAddSkill} type="button">Add</Button>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Current Skills</Label>
+              <div className="flex flex-wrap gap-2 min-h-[100px] p-3 border rounded-md">
+                {editedSkills.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No skills added yet</p>
+                ) : (
+                  editedSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                    >
+                      {skill}
+                      <button
+                        onClick={() => handleRemoveSkill(skill)}
+                        className="hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSkillsDialogOpen(false)}
+              disabled={updatingSkills}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateSkills} disabled={updatingSkills}>
+              {updatingSkills ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2"></div>
+                  Updating...
+                </>
+              ) : (
+                'Update Skills'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

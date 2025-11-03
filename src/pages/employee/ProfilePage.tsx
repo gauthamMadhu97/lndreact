@@ -1,20 +1,58 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Mail, Briefcase, Award, Calendar } from 'lucide-react'
-import { getEmployeeUtilization } from '@/data/mockData'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { User, Mail, Briefcase, Award, Calendar, Edit, X } from 'lucide-react'
+import { getEmployeeUtilization, updateUser } from '@/services/firebaseService'
 import { format } from 'date-fns'
 import type { AvailabilityStatus } from '@/types'
 
 export const ProfilePage = () => {
-  const { user } = useAuth()
-  const [availability, setAvailability] = useState<AvailabilityStatus>(user?.availability || 'available')
+  const { user, refreshUser } = useAuth()
+  const [utilization, setUtilization] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  // Skills dialog state
+  const [skillsDialogOpen, setSkillsDialogOpen] = useState(false)
+  const [skillInput, setSkillInput] = useState('')
+  const [editedSkills, setEditedSkills] = useState<string[]>([])
+  const [updatingSkills, setUpdatingSkills] = useState(false)
+
+  // Availability state
+  const [availability, setAvailability] = useState<AvailabilityStatus>('available')
+  const [updatingAvailability, setUpdatingAvailability] = useState(false)
+
+  useEffect(() => {
+    const fetchUtilization = async () => {
+      if (!user) return
+
+      try {
+        setLoading(true)
+        const userUtilization = await getEmployeeUtilization(user.uid)
+        setUtilization(userUtilization)
+        setAvailability(user.availability)
+      } catch (err) {
+        console.error('Error fetching utilization:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUtilization()
+  }, [user])
 
   if (!user) return null
-
-  const utilization = getEmployeeUtilization(user.uid)
 
   const availabilityOptions: { value: AvailabilityStatus; label: string; description: string; color: string }[] = [
     {
@@ -42,6 +80,62 @@ export const ProfilePage = () => {
       color: 'bg-red-500'
     }
   ]
+
+  // Skills handlers
+  const handleOpenSkillsDialog = () => {
+    setEditedSkills([...(user?.skills || [])])
+    setSkillInput('')
+    setSkillsDialogOpen(true)
+  }
+
+  const handleAddSkill = () => {
+    const trimmedSkill = skillInput.trim()
+    if (trimmedSkill && !editedSkills.includes(trimmedSkill)) {
+      setEditedSkills([...editedSkills, trimmedSkill])
+      setSkillInput('')
+    }
+  }
+
+  const handleRemoveSkill = (skillToRemove: string) => {
+    setEditedSkills(editedSkills.filter(skill => skill !== skillToRemove))
+  }
+
+  const handleUpdateSkills = async () => {
+    if (!user || editedSkills.length === 0) {
+      alert('Please add at least one skill.')
+      return
+    }
+
+    try {
+      setUpdatingSkills(true)
+      await updateUser(user.uid, { skills: editedSkills })
+      await refreshUser()
+      setSkillsDialogOpen(false)
+    } catch (err) {
+      console.error('Error updating skills:', err)
+      alert('Failed to update skills. Please try again.')
+    } finally {
+      setUpdatingSkills(false)
+    }
+  }
+
+  // Availability handler
+  const handleUpdateAvailability = async (newAvailability: AvailabilityStatus) => {
+    if (!user || newAvailability === user.availability) return
+
+    try {
+      setUpdatingAvailability(true)
+      setAvailability(newAvailability)
+      await updateUser(user.uid, { availability: newAvailability })
+      await refreshUser()
+    } catch (err) {
+      console.error('Error updating availability:', err)
+      setAvailability(user.availability)
+      alert('Failed to update availability. Please try again.')
+    } finally {
+      setUpdatingAvailability(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -108,9 +202,19 @@ export const ProfilePage = () => {
             </div>
 
             <div className="space-y-2 pt-4 border-t">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Award className="h-4 w-4" />
-                Skills
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Award className="h-4 w-4" />
+                  Skills
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleOpenSkillsDialog}
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {user.skills.map((skill) => (
@@ -119,9 +223,6 @@ export const ProfilePage = () => {
                   </Badge>
                 ))}
               </div>
-              <Button variant="outline" size="sm" className="mt-2">
-                Edit Skills
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -133,39 +234,46 @@ export const ProfilePage = () => {
             <CardDescription>Your workload and availability</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Utilization</span>
-                <span className="font-bold text-2xl">{utilization}%</span>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all ${
-                    utilization < 70 ? 'bg-green-500' :
-                    utilization < 90 ? 'bg-yellow-500' : 'bg-red-500'
-                  }`}
-                  style={{ width: `${utilization}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {utilization < 70 ? 'Available for more work' :
-                 utilization < 90 ? 'Near capacity' : 'Fully allocated'}
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Utilization</span>
+                    <span className="font-bold text-2xl">{utilization}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-3">
+                    <div
+                      className={`h-3 rounded-full transition-all ${utilization < 70 ? 'bg-green-500' :
+                          utilization < 90 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                      style={{ width: `${utilization > 100 ? 100 : utilization}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {utilization < 70 ? 'Available for more work' :
+                      utilization < 90 ? 'Near capacity' : 'Fully allocated'}
+                  </p>
+                </div>
 
-            <div className="space-y-2 pt-4 border-t">
-              <p className="text-sm font-medium">Availability Status</p>
-              <Badge
-                variant={
-                  availability === 'available' ? 'success' :
-                  availability === 'partial' ? 'warning' :
-                  availability === 'full' ? 'info' : 'destructive'
-                }
-                className="capitalize"
-              >
-                {availability}
-              </Badge>
-            </div>
+                <div className="space-y-2 pt-4 border-t">
+                  <p className="text-sm font-medium">Availability Status</p>
+                  <Badge
+                    variant={
+                      availability === 'available' ? 'success' :
+                        availability === 'partial' ? 'warning' :
+                          availability === 'full' ? 'info' : 'destructive'
+                    }
+                    className="capitalize"
+                  >
+                    {availability}
+                  </Badge>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -183,12 +291,12 @@ export const ProfilePage = () => {
             {availabilityOptions.map((option) => (
               <button
                 key={option.value}
-                onClick={() => setAvailability(option.value)}
-                className={`relative rounded-lg border-2 p-4 text-left transition-all hover:shadow-md ${
-                  availability === option.value
+                onClick={() => handleUpdateAvailability(option.value)}
+                disabled={updatingAvailability}
+                className={`relative rounded-lg border-2 p-4 text-left transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${availability === option.value
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                }`}
+                  }`}
               >
                 <div className="flex items-start gap-3">
                   <div className={`h-3 w-3 rounded-full ${option.color} mt-1`} />
@@ -205,28 +313,90 @@ export const ProfilePage = () => {
               </button>
             ))}
           </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline">Cancel</Button>
-            <Button>Save Changes</Button>
-          </div>
+          {updatingAvailability && (
+            <div className="flex items-center justify-center gap-2 mt-4 text-sm text-muted-foreground">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+              Updating availability...
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Team Page placeholder */}
-      {user.role === 'employee' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Work History</CardTitle>
-            <CardDescription>Your completed projects and contributions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <p>Your work history will appear here</p>
+      {/* Skills Dialog */}
+      <Dialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Skills</DialogTitle>
+            <DialogDescription>
+              Add or remove skills to showcase your expertise.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="skill-input">Add Skill</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="skill-input"
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddSkill()
+                    }
+                  }}
+                  placeholder="e.g., React, Python, Design"
+                />
+                <Button onClick={handleAddSkill} type="button">Add</Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            <div className="grid gap-2">
+              <Label>Current Skills</Label>
+              <div className="flex flex-wrap gap-2 min-h-[100px] p-3 border rounded-md">
+                {editedSkills.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No skills added yet</p>
+                ) : (
+                  editedSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                    >
+                      {skill}
+                      <button
+                        onClick={() => handleRemoveSkill(skill)}
+                        className="hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSkillsDialogOpen(false)}
+              disabled={updatingSkills}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateSkills} disabled={updatingSkills}>
+              {updatingSkills ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2"></div>
+                  Updating...
+                </>
+              ) : (
+                'Update Skills'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

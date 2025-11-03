@@ -1,27 +1,73 @@
-import { useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, Users, FolderKanban } from 'lucide-react'
+import { Calendar, Users, FolderKanban, Eye } from 'lucide-react'
 import {
   getAssignmentsByEmployee,
   getProjectById,
   getUserById
-} from '@/data/mockData'
+} from '@/services/firebaseService'
+import type { Assignment, Project, User as UserType } from '@/types'
 import { format } from 'date-fns'
+import { ProjectDetailsDialog } from '@/components/dialogs/ProjectDetailsDialog'
+
+interface ProjectWithAssignment {
+  assignment: Assignment
+  project: Project
+  manager: UserType | null
+}
 
 export const MyProjectsPage = () => {
   const { user } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [projects, setProjects] = useState<ProjectWithAssignment[]>([])
 
-  const projects = useMemo(() => {
-    if (!user) return []
-    const assignments = getAssignmentsByEmployee(user.uid)
-    return assignments.map(assignment => ({
-      assignment,
-      project: getProjectById(assignment.projectId),
-      manager: getUserById(getProjectById(assignment.projectId)?.managerId || '')
-    })).filter(item => item.project !== undefined)
+  // Project details dialog
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user) return
+
+      try {
+        setLoading(true)
+        const assignments = await getAssignmentsByEmployee(user.uid)
+
+        const projectsWithDetails = await Promise.all(
+          assignments.map(async (assignment) => {
+            try {
+              const project = await getProjectById(assignment.projectId)
+              if (!project) return null
+
+              let manager: UserType | null = null
+              if (project.managerId) {
+                try {
+                  manager = await getUserById(project.managerId)
+                } catch (err) {
+                  console.error('Error fetching manager:', err)
+                }
+              }
+
+              return { assignment, project, manager }
+            } catch (err) {
+              console.error('Error fetching project:', err)
+              return null
+            }
+          })
+        )
+
+        setProjects(projectsWithDetails.filter((p): p is ProjectWithAssignment => p !== null))
+      } catch (err) {
+        console.error('Error fetching projects:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProjects()
   }, [user])
 
   const getStatusVariant = (status: string) => {
@@ -36,6 +82,22 @@ export const MyProjectsPage = () => {
 
   const activeProjects = projects.filter(p => p.project?.status === 'active' || p.project?.status === 'planning')
   const completedProjects = projects.filter(p => p.project?.status === 'completed')
+
+  const handleViewDetails = (project: Project) => {
+    setSelectedProject(project)
+    setDetailsDialogOpen(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your projects...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -148,7 +210,12 @@ export const MyProjectsPage = () => {
                       )}
                     </div>
 
-                    <Button variant="outline" className="w-full">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleViewDetails(project)}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
                       View Details
                     </Button>
                   </CardContent>
@@ -184,7 +251,14 @@ export const MyProjectsPage = () => {
                             <span>Your allocation: {assignment.allocationPercentage}%</span>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm">View</Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(project)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
                       </div>
                     </div>
                   )
@@ -208,6 +282,13 @@ export const MyProjectsPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Project Details Dialog */}
+      <ProjectDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        project={selectedProject}
+      />
     </div>
   )
 }
