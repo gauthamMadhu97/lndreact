@@ -87,9 +87,6 @@ export const RegisterPage = () => {
 
       <Card className="w-full max-w-md shadow-2xl border-2 relative animate-in fade-in-0 zoom-in-95 duration-500">
         <CardHeader className="space-y-1 text-center pb-4">
-          <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg animate-in zoom-in duration-700">
-            <UserPlus className="h-8 w-8 text-white" />
-          </div>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Create Account
           </CardTitle>
