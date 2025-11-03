@@ -36,9 +36,3 @@ export const seedFirebaseData = async () => {
     throw error
   }
 }
-
-// Instructions:
-// To seed data:
-// 1. Register users first via the register page with their emails
-// 2. Then run this script to add additional user data, projects, and assignments
-// Or manually call seedFirebaseData() from the browser console

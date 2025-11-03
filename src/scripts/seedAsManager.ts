@@ -10,31 +10,31 @@ export const seedAsManager = async () => {
   const currentUser = auth.currentUser
 
   if (!currentUser) {
-    console.error('❌ You must be logged in to seed data!')
-    console.log('💡 Please register/login first, then run this script')
+    console.error(' You must be logged in to seed data!')
+    console.log(' Please register/login first, then run this script')
     return
   }
 
-  console.log('🔐 Logged in as:', currentUser.email)
-  console.log('🚀 Starting to seed data...')
+  console.log(' Logged in as:', currentUser.email)
+  console.log(' Starting to seed data...')
 
   try {
     // Get current user's Firestore data to check if they're a manager
     const userData = await getUser(currentUser.uid)
 
     if (!userData) {
-      console.error('❌ User profile not found in Firestore')
+      console.error(' User profile not found in Firestore')
       return
     }
 
     if (userData.role !== 'manager') {
-      console.error('❌ You must be logged in as a manager to seed data')
-      console.log('💡 Current role:', userData.role)
+      console.error(' You must be logged in as a manager to seed data')
+      console.log(' Current role:', userData.role)
       return
     }
 
-    console.log('✅ Confirmed manager role')
-    console.log('\n📁 Creating sample projects...')
+    console.log(' Confirmed manager role')
+    console.log('\n Creating sample projects...')
 
     // Create 2 projects with current user as manager
     const project1Id = await createProject({
@@ -47,7 +47,7 @@ export const seedAsManager = async () => {
       techStack: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
       managerId: currentUser.uid
     })
-    console.log('✓ Created project: E-commerce Platform Redesign')
+    console.log(' Created project: E-commerce Platform Redesign')
 
     const project2Id = await createProject({
       name: 'Mobile Banking App',
@@ -59,9 +59,9 @@ export const seedAsManager = async () => {
       techStack: ['React Native', 'Node.js', 'MongoDB', 'AWS'],
       managerId: currentUser.uid
     })
-    console.log('✓ Created project: Mobile Banking App')
+    console.log(' Created project: Mobile Banking App')
 
-    console.log('\n👥 Creating sample employees...')
+    console.log('\n Creating sample employees...')
 
     // Create 4 sample employees (these are just Firestore docs, not auth accounts)
     const employees = [
@@ -106,10 +106,10 @@ export const seedAsManager = async () => {
     for (const emp of employees) {
       const { uid, ...empData } = emp
       await createUser(uid, empData)
-      console.log(`✓ Created employee: ${emp.displayName}`)
+      console.log(` Created employee: ${emp.displayName}`)
     }
 
-    console.log('\n📋 Creating sample assignments...')
+    console.log('\n Creating sample assignments...')
 
     // Assign first 2 employees to project 1
     await createAssignment({
@@ -119,7 +119,7 @@ export const seedAsManager = async () => {
       startDate: new Date('2024-01-15'),
       assignedBy: currentUser.uid
     })
-    console.log(`✓ Assigned ${employees[0].displayName} to E-commerce Platform (60%)`)
+    console.log(` Assigned ${employees[0].displayName} to E-commerce Platform (60%)`)
 
     await createAssignment({
       employeeId: employees[1].uid,
@@ -128,7 +128,7 @@ export const seedAsManager = async () => {
       startDate: new Date('2024-01-20'),
       assignedBy: currentUser.uid
     })
-    console.log(`✓ Assigned ${employees[1].displayName} to E-commerce Platform (50%)`)
+    console.log(` Assigned ${employees[1].displayName} to E-commerce Platform (50%)`)
 
     // Assign third employee to project 2
     await createAssignment({
@@ -138,24 +138,19 @@ export const seedAsManager = async () => {
       startDate: new Date('2024-03-01'),
       assignedBy: currentUser.uid
     })
-    console.log(`✓ Assigned ${employees[2].displayName} to Mobile Banking App (40%)`)
+    console.log(` Assigned ${employees[2].displayName} to Mobile Banking App (40%)`)
 
-    console.log('\n✅ Data seeded successfully!')
-    console.log('\n📊 Summary:')
+    console.log('\n Data seeded successfully!')
+    console.log('\n Summary:')
     console.log(`   - Manager: ${userData.displayName} (you)`)
     console.log(`   - Projects: 2`)
     console.log(`   - Employees: 4 (Firestore docs only, not auth accounts)`)
     console.log(`   - Assignments: 3`)
-    console.log('\n💡 Note: Employee records are Firestore documents only.')
+    console.log('\n Note: Employee records are Firestore documents only.')
     console.log('   To login as an employee, register via /register page.')
 
   } catch (error) {
-    console.error('\n❌ Error seeding data:', error)
+    console.error('\n Error seeding data:', error)
     throw error
   }
 }
-
-// Instructions:
-// 1. Register/login as a manager first
-// 2. Open browser console
-// 3. Run: import('/src/scripts/seedAsManager.ts').then(m => m.seedAsManager())

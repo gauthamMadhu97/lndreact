@@ -99,10 +99,6 @@ export const ResourcesPage = () => {
             Manage your team members and their availability
           </p>
         </div>
-        <Button>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add Member
-        </Button>
       </div>
 
       {/* Filters */}
