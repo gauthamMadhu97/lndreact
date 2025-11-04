@@ -44,9 +44,29 @@ export const LoginPage = () => {
       // Navigation will happen automatically via the useEffect above
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message || 'Invalid credentials. Please try again.')
+        // Handle specific Firebase error codes
+        let errorMessage = err.message
+
+        if (errorMessage.includes('auth/invalid-credential') || errorMessage.includes('auth/wrong-password') || errorMessage.includes('auth/user-not-found')) {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.'
+        } else if (errorMessage.includes('auth/invalid-email')) {
+          errorMessage = 'Invalid email address. Please check and try again.'
+        } else if (errorMessage.includes('auth/user-disabled')) {
+          errorMessage = 'This account has been disabled. Please contact support.'
+        } else if (errorMessage.includes('auth/too-many-requests')) {
+          errorMessage = 'Too many failed login attempts. Please try again later or reset your password.'
+        } else if (errorMessage.includes('auth/network-request-failed')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.'
+        } else if (errorMessage.includes('User data not found')) {
+          errorMessage = 'Account setup incomplete. Please contact support.'
+        } else {
+          // Clean up generic Firebase error messages
+          errorMessage = errorMessage.replace('Firebase: ', '').replace(/\(auth\/.*?\)\.?/g, '').trim() || 'Login failed. Please try again.'
+        }
+
+        setError(errorMessage)
       } else {
-        setError('Invalid credentials. Please try again.')
+        setError('Login failed. Please try again.')
       }
     } finally {
       setIsSubmitting(false)
@@ -76,7 +96,7 @@ export const LoginPage = () => {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive/20 animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive animate-in slide-in-from-top-2 duration-300">
                 <p className="font-medium">{error}</p>
               </div>
             )}

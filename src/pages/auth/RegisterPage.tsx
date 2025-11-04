@@ -64,7 +64,25 @@ export const RegisterPage = () => {
       // Navigation will happen automatically via the useEffect above
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message || 'Registration failed. Please try again.')
+        // Handle specific Firebase error codes
+        let errorMessage = err.message
+
+        if (errorMessage.includes('auth/email-already-in-use')) {
+          errorMessage = 'This email is already registered. Please use a different email or sign in instead.'
+        } else if (errorMessage.includes('auth/invalid-email')) {
+          errorMessage = 'Invalid email address. Please check and try again.'
+        } else if (errorMessage.includes('auth/weak-password')) {
+          errorMessage = 'Password is too weak. Please use a stronger password.'
+        } else if (errorMessage.includes('auth/operation-not-allowed')) {
+          errorMessage = 'Email/password accounts are not enabled. Please contact support.'
+        } else if (errorMessage.includes('auth/network-request-failed')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.'
+        } else {
+          // Clean up generic Firebase error messages
+          errorMessage = errorMessage.replace('Firebase: ', '').replace(/\(auth\/.*?\)\.?/g, '').trim() || 'Registration failed. Please try again.'
+        }
+
+        setError(errorMessage)
       } else {
         setError('Registration failed. Please try again.')
       }
@@ -97,7 +115,7 @@ export const RegisterPage = () => {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive/20 animate-in slide-in-from-top-2 duration-300">
+              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive animate-in slide-in-from-top-2 duration-300">
                 <p className="font-medium">{error}</p>
               </div>
             )}

@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Fetch user data from Firestore
       const userData = await getUser(firebaseUser.uid)
       if (!userData) {
-        throw new Error('User data not found')
+        throw new Error('User data not found in database')
       }
       setUser(userData)
     } catch (error) {

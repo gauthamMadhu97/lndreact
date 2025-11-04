@@ -65,8 +65,16 @@
   background-color: hsl(var(--primary));
 }
 
+@utility bg-destructive {
+  background-color: hsl(var(--destructive));
+}
+
 @utility text-primary {
   color: hsl(var(--primary));
+}
+
+@utility text-destructive {
+  color: hsl(var(--destructive));
 }
 
 @utility text-foreground {
@@ -75,4 +83,8 @@
 
 @utility border-primary {
   border-color: hsl(var(--primary));
+}
+
+@utility border-destructive {
+  border-color: hsl(var(--destructive));
 }
