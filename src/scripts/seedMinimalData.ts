@@ -115,47 +115,47 @@ export const seedMinimalData = async () => {
 
   try {
     // Seed Users
-    console.log('\n📝 Seeding users...')
+    console.log('\n[SEEDING] Creating users...')
     for (const user of seedUsers) {
       const { uid, ...userData } = user
       await createUser(uid, userData)
-      console.log(` Created user: ${user.displayName} (${user.role})`)
+      console.log(`  - Created user: ${user.displayName} (${user.role})`)
     }
 
     // Seed Projects
-    console.log('\n Seeding projects...')
+    console.log('\n[SEEDING] Creating projects...')
     const projectIds: string[] = []
     for (const project of seedProjects) {
       const projectId = await createProject(project)
       projectIds.push(projectId)
-      console.log(` Created project: ${project.name} (ID: ${projectId})`)
+      console.log(`  - Created project: ${project.name} (ID: ${projectId})`)
     }
 
     // Seed Assignments (only if projects were created)
     if (projectIds.length > 0) {
-      console.log('\n Seeding assignments...')
+      console.log('\n[SEEDING] Creating assignments...')
       // Assign first 2 employees to first project
       for (let i = 0; i < 2; i++) {
         const assignment = seedAssignments[i]
         assignment.projectId = projectIds[0]
         await createAssignment(assignment)
-        console.log(` Created assignment: ${seedUsers[i + 2].displayName} → ${seedProjects[0].name}`)
+        console.log(`  - Created assignment: ${seedUsers[i + 2].displayName} to ${seedProjects[0].name}`)
       }
       // Assign third employee to second project
       if (projectIds.length > 1) {
         const assignment = seedAssignments[2]
         assignment.projectId = projectIds[1]
         await createAssignment(assignment)
-        console.log(` Created assignment: ${seedUsers[4].displayName} → ${seedProjects[1].name}`)
+        console.log(`  - Created assignment: ${seedUsers[4].displayName} to ${seedProjects[1].name}`)
       }
     }
 
-    console.log('\n Firebase data seeded successfully!')
-    console.log('\n Summary:')
-    console.log(`   - ${seedUsers.length} users (2 managers, 4 employees)`)
-    console.log(`   - ${seedProjects.length} projects`)
-    console.log(`   - ${seedAssignments.length} assignments`)
-    console.log('\n Note: New registered users will have no projects or assignments initially.')
+    console.log('\n[SUCCESS] Firebase data seeded successfully!')
+    console.log('\nSummary:')
+    console.log(`  - ${seedUsers.length} users (2 managers, 4 employees)`)
+    console.log(`  - ${seedProjects.length} projects`)
+    console.log(`  - ${seedAssignments.length} assignments`)
+    console.log('\nNote: New registered users will have no projects or assignments initially.')
   } catch (error) {
     console.error('\n Error seeding Firebase data:', error)
     throw error
